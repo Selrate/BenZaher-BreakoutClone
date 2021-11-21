@@ -7,15 +7,16 @@ TagManager:
   - Paddle
   - Block
   - KillZone
+  - Ball
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - Ball
   - Water
   - UI
-  - 
-  - 
+  - Particle
+  - PostProcessing
   - 
   - 
   - 

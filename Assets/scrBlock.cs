@@ -7,42 +7,80 @@ public class scrBlock : MonoBehaviour
 {
     private SphereCollider Sphere;
     private Vector3 v3BaseLocalScale;
+    private scrExplode ExplosionScript;
+    private bool bCanPump = true;
+
+    private bool bEnabled = true;
+
+    public bool GetEnabled() { return bEnabled; }
+    public void SetEnabled(bool _bEnabled) 
+    { 
+        bEnabled = _bEnabled;
+
+        // Re-enabled mesh
+        if(bEnabled)
+        {
+            GetComponent<BoxCollider>().enabled = true;
+            GetComponent<MeshRenderer>().enabled = true;
+        }
+    }
+
+    public static List<scrBlock> lAllBlocks { get; private set; } = new List<scrBlock>();
+
+    private void Awake()
+    {
+        lAllBlocks.Clear();
+    }
 
     // Start is called before the first frame update
     void Start()
     {
         Sphere = GetComponent<SphereCollider>();
+        ExplosionScript = GetComponent<scrExplode>();
         v3BaseLocalScale = transform.localScale;
+
+        // Add self to overall list
+        lAllBlocks.Add(this);
     }
 
     // Update is called once per frame
     void Update()
     {
-        if(Input.GetKeyDown(KeyCode.P))
-        {
-            transform.localScale = v3BaseLocalScale * 1.1f;
-            transform.DOScale(v3BaseLocalScale, 0.2f);
-        }
+        transform.localScale = Vector3.Lerp(transform.localScale, v3BaseLocalScale, 0.5f);
     }
 
 
     private void OnCollisionEnter(Collision collision)
     {
-        Sphere.enabled = true;
+        if (collision.gameObject.tag == "Ball")
+        {
+            Sphere.enabled = true;
+        }
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        transform.localScale = v3BaseLocalScale * 1.1f;
-        transform.DOScale(v3BaseLocalScale, 0.2f);
-
-        StartCoroutine(CycleSphere());
+        // Do wave
+        if (bCanPump)
+        {
+            bCanPump = false;
+            transform.localScale = v3BaseLocalScale * 1.2f;
+            StartCoroutine(CycleSphere());
+        }
     }
 
     private IEnumerator CycleSphere()
     {
+        // Cycle wave collider
+        yield return new WaitForSeconds(0.02f);
         Sphere.enabled = true;
-        yield return new WaitForSeconds(0.1f);
+        yield return new WaitForSeconds(0.2f);
         Sphere.enabled = false;
+        bCanPump = true;
+    }
+
+    private void OnDestroy()
+    {
+        lAllBlocks.Remove(this);
     }
 }

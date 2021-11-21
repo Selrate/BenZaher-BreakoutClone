@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using UnityEngine.Events;
+using DG.Tweening;
 
 public class scrScoreText : MonoBehaviour
 {
     private TextMeshProUGUI ScoreText;
     private int iLocalScore = 0;
     private bool bUpdateScore = false;
+    private Vector3 v3BaseLocalScale;
 
     // Start is called before the first frame update
     void Start()
@@ -24,6 +26,9 @@ public class scrScoreText : MonoBehaviour
 
         // Add an event listener
         scrGameManager.ScoreChanged.AddListener(UpdateScoreCallback);
+
+        // Store base scale
+        v3BaseLocalScale = transform.localScale;
     }
 
     // Update is called once per frame
@@ -37,7 +42,7 @@ public class scrScoreText : MonoBehaviour
             // Move local score to match game score
             if (iLocalScore != iGameScore)
             {
-                iLocalScore += (int)Mathf.Sign(iGameScore - iLocalScore);
+                iLocalScore += (int)Mathf.Sign(iGameScore - iLocalScore) * Mathf.Max(1,(int)(Mathf.Abs(iGameScore - iLocalScore)*0.05f));
             }
             // If it matches, stop updating
             else
@@ -54,5 +59,9 @@ public class scrScoreText : MonoBehaviour
     private void UpdateScoreCallback()
     {
         bUpdateScore = true;
+
+        // Tween FX
+        transform.localScale = v3BaseLocalScale * 1.2f;
+        transform.DOScale(v3BaseLocalScale, 0.2f);
     }
 }

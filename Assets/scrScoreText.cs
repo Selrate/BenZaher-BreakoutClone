@@ -4,12 +4,18 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.Events;
 using DG.Tweening;
+using Mirror;
 
-public class scrScoreText : MonoBehaviour
+public class scrScoreText : NetworkBehaviour
 {
     private TextMeshProUGUI ScoreText;
+
+    [SyncVar]
     private int iLocalScore = 0;
+
+    [SyncVar]
     private bool bUpdateScore = false;
+
     private Vector3 v3BaseLocalScale;
 
     // Start is called before the first frame update

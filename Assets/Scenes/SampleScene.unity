@@ -361,6 +361,7 @@ GameObject:
   - component: {fileID: 961496902}
   - component: {fileID: 961496901}
   - component: {fileID: 961496900}
+  - component: {fileID: 961496905}
   m_Layer: 0
   m_Name: Cube
   m_TagString: Untagged
@@ -380,6 +381,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 51a8ab0b006a70d4fbc4a762da3c73df, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  syncMode: 0
+  syncInterval: 0.1
   iCubesPerAxis: 8
   fDelay: 1
   fForce: 300
@@ -460,6 +463,23 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &961496905
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 961496899}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b91ecbcc199f4492b9a91e820070131, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  sceneId: 1157352720
+  serverOnly: 0
+  visible: 0
+  m_AssetId: 
+  hasSpawned: 0
 --- !u!1 &1145444333
 GameObject:
   m_ObjectHideFlags: 0

@@ -4,15 +4,20 @@ using UnityEngine;
 using DG.Tweening;
 using UnityEngine.Events;
 using UnityEngine.VFX;
+using Mirror;
+using System.Linq;
 
 [RequireComponent(typeof(Rigidbody))]
-public class scrBall : MonoBehaviour
+public class scrBall : NetworkBehaviour
 {
-    public static scrBall Instance { get; private set; } = null;
+    public static List<scrBall> Balls { get; private set; } = new List<scrBall>();
 
     private Rigidbody RB;
     private MeshRenderer MainRenderer;
+
+    [SyncVar]
     private bool bOnPaddle = true;
+    public bool GetOnPaddle() { return bOnPaddle; }
 
     [SerializeField]
     private float fLaunchSpeed = 10f;
@@ -26,12 +31,18 @@ public class scrBall : MonoBehaviour
     [SerializeField]
     private AudioSource AudioSRC;
 
+    private scrPaddle Paddle;
+    public void SetPaddle(scrPaddle _paddle) { Paddle = _paddle; }
+
+    private bool bHasPaddle = false;
 
     private void Awake()
     {
-        // Singleton
-        if (!Instance) Instance = this;
-        else Destroy(gameObject);
+        // Add self to list of balls
+        Balls.Add(this);
+
+        // Make sure there are no nulls
+        Balls = Balls.Where(b => b != null).ToList();
     }
 
     // Start is called before the first frame update
@@ -45,68 +56,75 @@ public class scrBall : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        // Launch
-        if(Input.GetKeyDown(KeyCode.Space) && !scrGameManager.Instance.GetWonGame())
-        {
-            if (bOnPaddle)
-            {
-                bOnPaddle = false;
+        // If had a paddle before, and now doesn't, player must have disconnected. Destroy the ball.
+        if (bHasPaddle && !Paddle) Destroy(gameObject);
 
-                // Set to not kinematic so it can move
-                RB.isKinematic = false;
+        // Make sure the ball has a paddle
+        if (!Paddle) Paddle = scrPaddle.Paddles.OrderBy(p => Vector3.Distance(transform.position, p.transform.position)).FirstOrDefault();
 
-                // Generate an angle
-                float fAngle = Mathf.Deg2Rad * Random.Range(-45f, 45f);
+        // Make sure paddle's ball ref is this (for client syncing)
+        if (Paddle.GetBall() == null) Paddle.SetBall(this);
 
-                // Generate a launch vector from the angle
-                Vector3 v3LaunchDir = new Vector3(Mathf.Sin(fAngle), Mathf.Cos(fAngle));
-
-                // Set the ball's launch speed
-                RB.AddForce(v3LaunchDir * fLaunchSpeed);
-            }
-            else
-            {
-                Reset();
-            }
-        }
+        // Flag as having set paddle
+        bHasPaddle = true;
 
         // Redundancy reset
-        if (Vector3.Distance(transform.position, scrPaddle.Instance.transform.position) > 100f) Reset();
+        if (Vector3.Distance(transform.position, Paddle.transform.position) > 100f) Reset();
+    }
+
+    [Command(requiresAuthority = false)]
+    public void Launch()
+    {
+        bOnPaddle = false;
+
+        // Set to not kinematic so it can move
+        RB.isKinematic = false;
+
+        // Generate an angle
+        float fAngle = Mathf.Deg2Rad * Random.Range(-45f, 45f);
+
+        // Generate a launch vector from the angle
+        Vector3 v3LaunchDir = new Vector3(Mathf.Sin(fAngle), Mathf.Cos(fAngle));
+
+        // Set the ball's launch speed
+        RB.AddForce(v3LaunchDir * fLaunchSpeed);
     }
 
     private void LateUpdate()
     {
+        if (!Paddle) return;
+
         // While on paddle, follow it
-        if(bOnPaddle)
+        if (bOnPaddle && Paddle)
         {
-            transform.position = new Vector3(scrPaddle.Instance.transform.position.x, transform.position.y);
+            transform.position = new Vector3(Paddle.transform.position.x, transform.position.y);
         }
     }
 
     // On collision 
     private void OnCollisionEnter(Collision collision)
     {
-  
-         // Paddle impact
-         GameObject NewImpact = Instantiate<GameObject>(SmallImpact, collision.GetContact(0).point, Quaternion.Euler(collision.GetContact(0).normal));
-         Camera.main.DOShakePosition(0.05f, RB.velocity.magnitude * 0.002f);
+        if (!isServer) return;
+        if (!Paddle) return;
 
-         // Paddle sound
+        // Paddle impact
+        GameObject NewImpact = Instantiate<GameObject>(SmallImpact, collision.GetContact(0).point, Quaternion.Euler(collision.GetContact(0).normal));
+        NetworkServer.Spawn(NewImpact);
+        Camera.main.DOShakePosition(0.05f, RB.velocity.magnitude * 0.002f);
 
-         // Get a random number
-         int iRandom = Mathf.Clamp(Random.Range(0, 6), 0, 5);
+        // Get a random number
+        int iRandom = Mathf.Clamp(Random.Range(0, 6), 0, 5);
 
-         // Load the corresponding bounce sound
-         AudioClip FireworkClip = Resources.Load<AudioClip>("Audio/Bounce" + iRandom.ToString());
-
-         // Play it
-         AudioSRC.PlayOneShot(FireworkClip);
-        
+        // Play clip
+        PlayClip("Audio/Bounce" + iRandom.ToString());    
     }
 
     // After colliding
     private void OnCollisionExit(Collision collision)
     {
+        if (!isServer) return;
+        if (!Paddle) return;
+
         // Get velocity from paddle
         if (collision.collider.tag == "Paddle")
         {
@@ -114,7 +132,7 @@ public class scrBall : MonoBehaviour
             Vector3 v3NewVelocity = RB.velocity;
 
             // Add vecloty of paddle
-            v3NewVelocity.x += scrPaddle.Instance.GetRigidbody().velocity.x * fFrictionTransfer;
+            v3NewVelocity.x += Paddle.GetRigidbody().velocity.x * fFrictionTransfer;
 
             // Update velocity
             RB.velocity = v3NewVelocity;
@@ -126,7 +144,7 @@ public class scrBall : MonoBehaviour
         {
             // Spawn firework
             GameObject NewFirework = Instantiate<GameObject>(Firework, new Vector3(0f, -10f, 10f), Quaternion.identity);
-
+            
             // Set firework color
             VisualEffect Fireworks = NewFirework.GetComponent<VisualEffect>();
             Gradient NewGradient = Fireworks.GetGradient("ColorGradient");
@@ -137,11 +155,15 @@ public class scrBall : MonoBehaviour
             Fireworks.SetGradient("ColorGradient", NewGradient);
             Fireworks.SendEvent("SpawnFirework");
 
+            NetworkServer.Spawn(NewFirework);
+
             // Impact
             GameObject ImpactSpawn = Instantiate<GameObject>(Impact, transform.position - new Vector3(0f,0f,5f), Quaternion.identity);
             ImpactSpawn.GetComponent<VisualEffect>().SetVector4("Color1", collision.gameObject.GetComponent<Renderer>().material.color*255f);
+            NetworkServer.Spawn(ImpactSpawn);
 
             // Destroy the block
+            Debug.Log("BlockCall!");
             collision.gameObject.GetComponent<scrExplode>().StartExplosion();
 
             // Add score
@@ -151,59 +173,80 @@ public class scrBall : MonoBehaviour
             Camera.main.DOShakePosition(0.1f, RB.velocity.magnitude * 0.01f);
 
             // Chroma
-            scrGameManager.ChromaticEffect();
+            scrGameManager.Instance.ChromaticEffect();
         }
     }
+
+ 
 
     // Trigger handling
     private void OnTriggerEnter(Collider other)
     {
+        if (!isServer) return;
+        if (!Paddle) return;
+
         // KillZone
-        if(other.gameObject.tag == "KillZone")
+        if (other.gameObject.tag == "KillZone")
         {
             // Reset
             Reset();
         }
     }
 
+    [Command(requiresAuthority = false)]
     public void Reset()
     {
+        if (!isServer) return;
+        if (!Paddle) return;
+
         // Play death fizzle
         GameObject NewFizzle = Instantiate<GameObject>(DeathFizzle, transform.position, Quaternion.identity);
+        NetworkServer.Spawn(NewFizzle);
 
         // Reset
         bOnPaddle = true;
         RB.velocity = Vector3.zero;
         RB.isKinematic = true;
 
-        transform.position = scrPaddle.Instance.transform.position + new Vector3(0f, 1f, 0f);
+        transform.position = Paddle.transform.position + new Vector3(0f, 1f, 0f);
 
         // Play death sound
-        AudioSRC.PlayOneShot(Resources.Load<AudioClip>("Audio/Death"));
+        PlayClip("Audio/Death");
 
         // Reduce score
         scrGameManager.AddScore(-200);
 
         // Play effect
         GameObject NewRespawn = Instantiate<GameObject>(Respawn, transform.position, Quaternion.identity);
+        NetworkServer.Spawn(NewRespawn);
         NewRespawn.GetComponent<VisualEffect>().SendEvent("TriggerEffect");
 
         transform.localScale = Vector3.zero;
         transform.DOScale(Vector3.one, 1f).SetEase(Ease.InOutBack);
     }
 
+    [ClientRpc]
+    void PlayClip(string _sClipPath)
+    {
+        AudioSRC.PlayOneShot(Resources.Load<AudioClip>(_sClipPath));
+    }
+
     public void NewGameReset()
     {
+        if (!isServer) return;
+        if (!Paddle) return;
+
         // Reset
         bOnPaddle = true;
         RB.velocity = Vector3.zero;
         RB.isKinematic = true;
 
-        transform.position = scrPaddle.Instance.transform.position + new Vector3(0f, 1f, 0f);
+        transform.position = Paddle.transform.position + new Vector3(0f, 1f, 0f);
 
         // Play effect
         GameObject NewRespawn = Instantiate<GameObject>(Respawn, transform.position, Quaternion.identity);
         NewRespawn.GetComponent<VisualEffect>().SendEvent("TriggerEffect");
+        NetworkServer.Spawn(NewRespawn);
 
         transform.localScale = Vector3.zero;
         transform.DOScale(Vector3.one, 1f).SetEase(Ease.InOutBack);

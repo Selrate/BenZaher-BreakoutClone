@@ -2,8 +2,9 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using DG.Tweening;
+using Mirror;
 
-public class scrExplode : MonoBehaviour
+public class scrExplode : NetworkBehaviour
 {
     [SerializeField]
     private int iCubesPerAxis = 8;
@@ -17,6 +18,9 @@ public class scrExplode : MonoBehaviour
 
     private scrBlock Block;
 
+    private bool bDoExplosion = false;
+    public void SetExplosion(bool _bExplode) { bDoExplosion = _bExplode; }
+
     // Start is called before the first frame update
     void Start()
     {
@@ -25,9 +29,15 @@ public class scrExplode : MonoBehaviour
         Block = GetComponent<scrBlock>();
     }
 
+    private void Update()
+    {
+        
+    }
+
+    [ClientRpc]
     public void StartExplosion()
     {
-
+        Debug.Log("BlockHit!");
         // Create cube at fracture coordinates
         for(int x = 0; x < iCubesPerAxis; x++)
         {

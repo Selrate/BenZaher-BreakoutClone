@@ -2,17 +2,23 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using DG.Tweening;
+using Mirror;
+using System.Linq;
 
-public class scrBlock : MonoBehaviour
+public class scrBlock : NetworkBehaviour
 {
     private SphereCollider Sphere;
     private Vector3 v3BaseLocalScale;
     private scrExplode ExplosionScript;
+
+    [SyncVar]
     private bool bCanPump = true;
 
+    [SyncVar]
     private bool bEnabled = true;
 
     public bool GetEnabled() { return bEnabled; }
+
     public void SetEnabled(bool _bEnabled) 
     { 
         bEnabled = _bEnabled;
@@ -29,7 +35,7 @@ public class scrBlock : MonoBehaviour
 
     private void Awake()
     {
-        lAllBlocks.Clear();
+        lAllBlocks = lAllBlocks.Where(b => b != null).ToList();
     }
 
     // Start is called before the first frame update
